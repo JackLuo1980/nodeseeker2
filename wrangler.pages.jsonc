@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nodeseeker2",
+  "pages_build_output_dir": "./dist/client",
+  "compatibility_date": "2026-03-12",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nodeseeker",
+      "database_id": "8f011d77-0423-48d0-ac90-68402f63079b"
+    }
+  ]
+}

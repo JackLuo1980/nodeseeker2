@@ -1,171 +1,134 @@
-# 🚀 NodeSeek RSS 监控系统
+# NodeSeek RSS Monitor
 
-Docker 版本请移步 ➡️ [NodeSeeker-docker](https://github.com/ljnchn/NodeSeeker-docker)
+一个以 Cloudflare Pages Functions 为优先部署方式的 NodeSeek RSS 订阅与 Telegram 推送工具。
 
----
+当前仓库公开地址：
+[JackLuo1980/nodeseeker2](https://github.com/JackLuo1980/nodeseeker2)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/ljnchn/NodeSeeker.git)
+## 当前部署模式
 
-一个基于 Cloudflare Workers 的智能 RSS 监控和 Telegram 推送系统，专门用于监控 NodeSeek 社区的最新动态。
+- Pages 优先：Web 界面、API、Telegram Webhook 运行在 Pages Functions
+- D1 数据库存储配置、订阅和文章数据
+- 轮询抓取通过内部接口 `/internal/poll` 触发，适合配合外部 cron 缩短推送时差
+- Worker 兼容入口仍然保留，但不再是推荐部署路径
 
-## ✨ 功能特性
+## Pages 部署
 
-- 🔄 **自动 RSS 抓取**：定时抓取 NodeSeek 社区 RSS 数据，确保信息不遗漏。
-- 🎯 **智能关键词匹配**：支持多关键词组合匹配，可按创建者和分类进行精准过滤。
-- 📱 **Telegram Bot 推送**：实时将匹配的文章推送到您的 Telegram，随时随地掌握动态。
-- 🌐 **Web 管理界面**：提供直观的 Web 操作界面，轻松管理订阅规则和系统配置。
-- ⚡ **高性能架构**：基于 Cloudflare Workers 构建，享受全球边缘网络的低延迟和高可用性。
-- 🗄️ **D1 数据库**：使用 Cloudflare 原生 D1 数据库存储数据，稳定可靠。
-- 🔐 **安全认证**：内置 JWT 认证和密码加密存储，保障您的账户安全。
-- 📊 **统计监控**：实时查看推送统计和系统状态，全面了解系统运行状况。
+Cloudflare 官方文档说明：
+- Pages Functions 支持通过 Wrangler 配置文件管理绑定与构建输出
+- `wrangler pages deploy` 可以上传静态资源和 `functions` 目录
+- 如果要部署 `functions` 目录，不能只用 Dashboard 的拖拽上传，必须用 Wrangler
 
-## 🏗️ 技术架构
+参考：
+- [Pages Functions configuration](https://developers.cloudflare.com/pages/functions/wrangler-configuration/)
+- [Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)
+- [Use Direct Upload with CI](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/)
 
-- **平台**：Cloudflare Workers + Hono.js + Vite
-- **数据库**：Cloudflare D1 (SQLite)
-- **前端**：原生 HTML/CSS/JavaScript
-- **认证**：JWT (密码使用 BCrypt 加密)
-- **推送**：Telegram Bot API
-- **RSS 解析**：rss-parser
+### 推荐方式一：Pages Git 集成
 
-## 🚀 部署指南
-
-我们提供两种部署方式：一键部署和手动部署。推荐使用一键部署，流程更简单。
-
-### 方式一：一键部署 (推荐)
-
-1. 点击上方的 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/ljnchn/NodeSeeker.git) 按钮。
-2. 授权 Cloudflare 访问您的 GitHub 仓库。
-3. 按照提示完成部署流程，Cloudflare 将自动为您完成项目创建和配置。
-4. 部署完成后，访问域名，系统会引导您创建一个管理员账户。
-5. 登录后，在「基础设置」页面配置 Telegram Bot Token。
-6. 配置完成后，在「推送设置」页面配置推送规则。
-
-### 方式二：手动部署
-
-#### 1. 前置要求
-
-在开始之前，请确保您已安装以下工具和拥有相应账户：
-
-- [Node.js](https://nodejs.org/) (版本 18 或更高)
-- [pnpm](https://pnpm.io/)
-- [Cloudflare 账户](https://dash.cloudflare.com/sign-up)
-- [Telegram Bot Token](https://core.telegram.org/bots#6-botfather)
-
-#### 2. 配置流程
-
-1.  **克隆仓库**
-    ```bash
-    git clone https://github.com/ljnchn/NodeSeeker.git
-    cd your-repo-name
-    ```
-
-2.  **安装依赖**
-    ```bash
-    pnpm install
-    ```
-
-3.  **创建 D1 数据库**
-    执行以下命令创建一个名为 `nodeseek-rss` 的 D1 数据库。
-    ```bash
-    pnpm run db:create
-    ```
-    该命令会更新您的 `wrangler.toml` 文件，自动绑定数据库。
-
-
-5.  **部署到 Cloudflare**
-    ```bash
-    # 部署到开发环境
-    pnpm run deploy
-
-    # 或部署到生产环境
-    pnpm run deploy:prod
-    ```
-
-## 🛠️ 使用说明
-
-部署成功后，您可以开始配置和使用系统。
-
-### 1. 初始化系统
-
-首次访问您的 Worker URL，系统会引导您创建一个管理员账户。请设置一个安全的密码，该密码将经过加密后存储。
-
-### 2. Telegram Bot 设置
-
-#### 快速设置
-
-1.  **获取 Bot Token**
-    - 在 Telegram 中搜索 `@BotFather`。
-    - 发送 `/newbot` 创建一个新的 Bot。
-    - 按照提示设置 Bot 的名称和用户名。
-    - 复制并妥善保管您获得的 Bot Token。
-
-2.  **配置 Bot Token**
-    - 在系统 Web 界面的「基础设置」页面。
-    - 在「Bot Token 配置」区域输入您的 Token。
-    - 点击「保存并验证」。系统将自动验证 Token 的有效性、设置 Webhook 并创建 Bot 命令菜单。
-
-3.  **绑定用户**
-    - Bot Token 配置成功后，页面会显示绑定指引。
-    - 在 Telegram 中搜索您的 Bot。
-    - 向 Bot 发送 `/start` 命令。系统会自动保存您的 Chat ID，完成绑定。
-
-4.  **推送设置**
-    - 在「推送设置」区域，您可以管理消息推送。
-    - **停止/恢复推送**：随时暂停或恢复所有消息推送。
-    - **只匹配标题**：设置是否仅在文章标题中搜索关键词。
-
-#### Bot 命令
-
-绑定成功后，您可以在 Telegram 中使用以下命令与 Bot 交互：
-
-- `/start` - 重新绑定并查看欢迎信息
-- `/getme` - 查看 Bot 和绑定状态信息
-- `/unbind` - 解除用户绑定
-- `/stop` - 停止推送
-- `/resume` - 恢复推送
-- `/list` - 查看订阅列表
-- `/add 关键词1 关键词2` - 添加订阅（最多3个关键词）
-- `/del 订阅ID` - 删除订阅
-- `/post` - 查看最近文章
-- `/help` - 显示帮助信息
-
-## 💻 本地开发
-
-如果您希望在本地进行开发和测试：
-
-1.  **启动开发服务器**
-    ```bash
-    pnpm dev
-    ```
-    此命令会启动一个本地服务器，并监听文件变化。
-
-2.  **生成 Cloudflare 类型**
-    为了获得完整的 TypeScript 类型提示，请运行：
-    ```bash
-    pnpm run cf-typegen
-    ```
-
-## 📜 开发命令
+1. 在 Cloudflare 创建一个 Pages 项目并连接这个仓库
+2. 生产分支选择 `main`
+3. 构建命令填写：
 
 ```bash
-# 开发
-pnpm dev                 # 启动开发服务器
-pnpm build               # 构建项目
-pnpm test                # 运行测试
-
-# 部署
-pnpm run deploy          # 部署到开发环境
-pnpm run deploy:prod     # 部署到生产环境
-
-# 数据库
-pnpm run db:create       # 创建数据库
-pnpm run db:migrate      # 运行数据库迁移
-
-# 监控
-pnpm run logs            # 查看线上日志
+pnpm install && pnpm run build
 ```
 
-## 📄 许可证
+4. 构建输出目录填写：
 
-本项目基于 MIT 许可证开源。
+```bash
+dist/client
+```
+
+5. 绑定 D1 数据库：
+
+- Binding：`DB`
+- Database：`nodeseeker`
+
+6. 可选环境变量：
+
+```bash
+POLL_SECRET=替换成高强度随机字符串
+```
+
+### 推荐方式二：Wrangler 直传 Pages
+
+本仓库已经提供 Pages 配置文件 [wrangler.pages.jsonc](./wrangler.pages.jsonc)。
+
+常用命令：
+
+```bash
+pnpm install
+pnpm run build
+pnpm run deploy:pages
+```
+
+本地调试 Pages：
+
+```bash
+pnpm run dev:pages
+```
+
+## Telegram 和 RSS 轮询
+
+### Telegram Webhook
+
+Pages 部署后，Bot Webhook 仍然指向：
+
+```text
+https://你的-pages-域名/telegram/webhook
+```
+
+### 低时差轮询
+
+Pages 没有与当前 Worker `scheduled` 完全等价的入口，所以本仓库提供：
+
+```text
+POST /internal/poll
+```
+
+调用方式：
+
+```bash
+curl -X POST "https://你的-pages-域名/internal/poll" \
+  -H "Authorization: Bearer $POLL_SECRET"
+```
+
+建议：
+
+- 15 到 30 秒触发一次
+- 可用 GitHub Actions、cron-job.org、Uptime Kuma 或你自己的服务器定时任务
+
+## 诊断接口
+
+如果部署后需要快速确认 Pages Functions 是否已启动、D1 是否已绑定，可访问：
+
+```text
+/__diag
+```
+
+正常情况下会返回 JSON，例如：
+
+```json
+{
+  "ok": true,
+  "bindings": {
+    "hasDB": true
+  }
+}
+```
+
+## 仓库状态
+
+- 当前仓库已经是公开仓库
+- Pages 入口文件位于 [functions/[[path]].ts](./functions/[[path]].ts)
+- 应用主入口位于 [src/app.ts](./src/app.ts)
+- 轮询服务位于 [src/services/poller.ts](./src/services/poller.ts)
+
+## 仍保留的 Worker 兼容命令
+
+如果你还想临时用 Worker 部署，也保留了：
+
+```bash
+pnpm run deploy:worker
+```

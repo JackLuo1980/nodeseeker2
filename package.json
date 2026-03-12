@@ -5,7 +5,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "pnpm run build && vite preview",
-    "deploy": "pnpm run build && wrangler deploy --config dist/nodeseeker2/wrangler.json",
+    "dev:pages": "pnpm run build && wrangler pages dev --config wrangler.pages.jsonc",
+    "deploy": "pnpm run deploy:pages",
+    "deploy:pages": "pnpm run build && wrangler pages deploy --config wrangler.pages.jsonc",
+    "deploy:worker": "pnpm run build && wrangler deploy --config dist/nodeseeker2/wrangler.json",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "db:create": "wrangler d1 create nodeseeker-db",
     "db:migrate": "wrangler d1 execute nodeseeker-db --file=./migrations/0001_initial.sql"
