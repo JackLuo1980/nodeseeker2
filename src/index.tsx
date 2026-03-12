@@ -1,104 +1,53 @@
-import { Hono } from 'hono'
-import { renderer } from './renderer'
-import { cors } from 'hono/cors'
+import { app, type Bindings } from './app'
+import { runFeedPolling } from './services/poller'
 
-// 导入服务
-import { DatabaseService } from './services/database'
-import { AuthService } from './services/auth'
-import { RSSService } from './services/rss'
-import { TelegramService } from './services/telegram'
-import { MatcherService } from './services/matcher'
+function formatError(error: unknown): { message: string; stack?: string } {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      stack: error.stack
+    }
+  }
 
-// 导入中间件
-import {
-  requestLoggerMiddleware,
-  errorHandlerMiddleware,
-  corsConfig,
-  rateLimitMiddleware
-} from './middleware/auth'
-
-// 导入路由
-import { authRoutes } from './routes/auth'
-import { apiRoutes } from './routes/api'
-import { telegramRoutes } from './routes/telegram'
-import { pageRoutes } from './routes/pages'
-
-type Bindings = {
-  DB: D1Database
-  ENVIRONMENT: string
+  return {
+    message: String(error)
+  }
 }
-
-type Variables = {
-  dbService: DatabaseService
-  authService: AuthService
-}
-
-const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
-
-// 全局中间件
-app.use('*', errorHandlerMiddleware)
-app.use('*', requestLoggerMiddleware)
-app.use('*', cors(corsConfig))
-app.use('*', rateLimitMiddleware(200, 60000)) // 每分钟最多200个请求
-app.use(renderer)
-
-// 初始化服务
-app.use('*', async (c, next) => {
-  const dbService = new DatabaseService(c.env.DB)
-  const authService = new AuthService(dbService)
-
-  c.set('dbService', dbService)
-  c.set('authService', authService)
-
-  await next()
-})
-
-// 路由
-app.route('/auth', authRoutes)
-app.route('/api', apiRoutes)
-app.route('/telegram', telegramRoutes)
-app.route('/', pageRoutes)
 
 // 定时任务处理器
 export default {
-  fetch: app.fetch,
+  async fetch(request: Request, env: Bindings, ctx: ExecutionContext): Promise<Response> {
+    try {
+      return await app.fetch(request, env, ctx)
+    } catch (error) {
+      const formatted = formatError(error)
+      console.error('顶层请求处理失败:', formatted.message, formatted.stack || '')
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: formatted.message,
+          stack: formatted.stack || null,
+          path: new URL(request.url).pathname,
+          hint: '请先访问 /__diag 确认 DB 绑定是否存在'
+        }),
+        {
+          status: 500,
+          headers: {
+            'content-type': 'application/json; charset=UTF-8'
+          }
+        }
+      )
+    }
+  },
 
   // 定时任务处理器
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
-    const cronExpression = event.cron.trim();
+    const cronExpression = event.cron.trim()
     console.log(`开始执行定时任务，cron: ${cronExpression}`)
 
     try {
-      const dbService = new DatabaseService(env.DB)
-
-      // RSS抓取和推送任务（每分钟执行）
-      const config = await dbService.getBaseConfig()
-
-      if (!config || !config.bot_token) {
-        console.log('系统未配置，跳过RSS抓取任务')
-        return
-      }
-
-      const rssService = new RSSService(dbService)
-      const telegramService = new TelegramService(dbService, config.bot_token)
-      const matcherService = new MatcherService(dbService, telegramService)
-
-      // 1. 抓取新的RSS数据
-      console.log('开始抓取RSS数据...')
-      const rssResult = await rssService.processNewRSSData()
-      console.log(`RSS抓取完成: 新增 ${rssResult.new} 篇文章`)
-
-      // 2. 处理未推送的文章
-      if (rssResult.new > 0) {
-        console.log('开始处理推送...')
-        const pushResult = await matcherService.processUnpushedPosts()
-        console.log(`推送完成: 推送 ${pushResult.pushed} 篇文章`)
-      }
-      // 3. 数据清理任务
-      console.log('执行数据清理任务...')
-      const cleanupResult = await dbService.cleanupOldPosts()
-      console.log(`数据清理完成: 删除了 ${cleanupResult.deletedCount} 条过期记录`)
-
+      await runFeedPolling(env, 'cron')
     } catch (error) {
       console.error('定时任务执行失败:', error)
     }
