@@ -204,11 +204,28 @@ export class TelegramService {
   }
 
   /**
+   * 将现有的 Markdown 风格文案降级成 Telegram 可稳定发送的纯文本
+   */
+  private normalizeTelegramText(text: string): string {
+    return text
+      .replace(/\*\*/g, '')
+      .replace(/\\-/g, '-')
+      .replace(/\\\+/g, '+')
+      .replace(/\[(.*?)\]\((.*?)\)/g, '$1\n$2')
+      .replace(/[ \t]+\n/g, '\n')
+      .trim();
+  }
+
+  private async replyText(ctx: Context, text: string): Promise<void> {
+    await ctx.reply(this.normalizeTelegramText(text));
+  }
+
+  /**
    * 发送消息到 Telegram
    */
   async sendMessage(chatId: string | number, text: string): Promise<boolean> {
     try {
-      await this.bot.api.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+      await this.bot.api.sendMessage(chatId, this.normalizeTelegramText(text));
       return true;
     } catch (error) {
       console.error('发送 Telegram 消息时出错:', error);
@@ -308,7 +325,7 @@ export class TelegramService {
 /stop - 停止推送
 /resume - 恢复推送
         `;
-        await ctx.reply(welcomeText, { parse_mode: 'Markdown' });
+        await this.replyText(ctx, welcomeText);
         return;
       } else {
         // 如果是其他用户尝试绑定，拒绝
@@ -322,7 +339,7 @@ export class TelegramService {
 
 📋 **当前可用命令：**
 /help - 查看帮助
-/getme - 查看绑定状态`, { parse_mode: 'Markdown' });
+/getme - 查看绑定状态`);
         return;
       }
     }
@@ -353,7 +370,7 @@ export class TelegramService {
 /resume - 恢复推送
     `;
 
-    await ctx.reply(welcomeText, { parse_mode: 'Markdown' });
+    await this.replyText(ctx, welcomeText);
   }
 
   /**
@@ -406,7 +423,7 @@ export class TelegramService {
 
     text += '💡 使用 /del 订阅ID 删除订阅';
 
-    await ctx.reply(text, { parse_mode: 'Markdown' });
+    await this.replyText(ctx, text);
   }
 
   /**
@@ -416,7 +433,7 @@ export class TelegramService {
     const args = ctx.message?.text?.split(' ').slice(1) || [];
     
     if (args.length === 0) {
-      await ctx.reply('❌ 请提供关键词。\n**用法：** /add 关键词1 关键词2 关键词3', { parse_mode: 'Markdown' });
+      await this.replyText(ctx, '❌ 请提供关键词。\n**用法：** /add 关键词1 关键词2 关键词3');
       return;
     }
 
@@ -433,7 +450,7 @@ export class TelegramService {
       if (sub.keyword2) text += ` \\+ ${sub.keyword2}`;
       if (sub.keyword3) text += ` \\+ ${sub.keyword3}`;
 
-      await ctx.reply(text, { parse_mode: 'Markdown' });
+      await this.replyText(ctx, text);
     } catch (error) {
       await ctx.reply(`❌ 添加订阅失败：${error}`);
     }
@@ -446,7 +463,7 @@ export class TelegramService {
     const args = ctx.message?.text?.split(' ').slice(1) || [];
     
     if (args.length === 0) {
-      await ctx.reply('❌ 请提供订阅 ID。\n**用法：** /del 订阅ID', { parse_mode: 'Markdown' });
+      await this.replyText(ctx, '❌ 请提供订阅 ID。\n**用法：** /del 订阅ID');
       return;
     }
 
@@ -484,7 +501,7 @@ export class TelegramService {
       text += `${index + 1}. [${post.title}](https://www.nodeseek.com/post-${post.post_id}-1)\n`;
     });
 
-    await ctx.reply(text, { parse_mode: 'Markdown' });
+    await this.replyText(ctx, text);
   }
 
   /**
@@ -514,7 +531,7 @@ export class TelegramService {
 \\- 使用 /getme 查看当前绑定状态和 Bot 详细信息
     `;
 
-    await ctx.reply(helpText, { parse_mode: 'Markdown' });
+    await this.replyText(ctx, helpText);
   }
 
   /**
@@ -558,7 +575,7 @@ ${userBindingStatus}
 💡 **提示：** 使用 /help 查看所有可用命令
       `;
 
-      await ctx.reply(text, { parse_mode: 'Markdown' });
+      await this.replyText(ctx, text);
     } catch (error) {
       console.error('处理 /getme 命令失败:', error);
       await ctx.reply('❌ 获取信息时发生错误');
@@ -585,7 +602,7 @@ ${userBindingStatus}
       bound_user_username: undefined 
     });
     
-    await ctx.reply('✅ **绑定已解除**\n\n您将不再接收推送消息。如需重新绑定，请发送 /start 命令。', { parse_mode: 'Markdown' });
+    await this.replyText(ctx, '✅ **绑定已解除**\n\n您将不再接收推送消息。如需重新绑定，请发送 /start 命令。');
   }
 
   /**
@@ -598,7 +615,7 @@ ${userBindingStatus}
         return false;
       }
 
-      // 构建关键词字符串，用markdown格式的标签包裹
+      // 使用纯文本格式，避免 Telegram Markdown 解析导致发送失败
       const keywords = [matchedSub.keyword1, matchedSub.keyword2, matchedSub.keyword3]
         .filter(k => k && k.trim().length > 0)
         .join(' ');
@@ -611,17 +628,13 @@ ${userBindingStatus}
       // 构建帖子链接
       const postUrl = `https://www.nodeseek.com/post-${post.post_id}-1`;
 
-      // 去除 post.title 会影响markdown链接的符号
-      const title = post.title
-        .replace(/\[/g, "「")
-        .replace(/\]/g, "」")
-        .replace(/\(/g, "（")
-        .replace(/\)/g, "）");
+      const title = post.title.trim();
 
       const text = `
-**${keywordsStr} ${creator} ${category}**
+${keywordsStr} ${creator} ${category}
 
-**[${title}](${postUrl})**
+📰 ${title}
+🔗 ${postUrl}
       `;
 
       const success = await this.sendMessage(config.chat_id, text);
