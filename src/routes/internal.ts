@@ -7,7 +7,8 @@ export const internalRoutes = new Hono<{ Bindings: Bindings; Variables: Variable
 function isAuthorized(c: any): boolean {
   const secret = c.env.POLL_SECRET?.trim()
   if (!secret) {
-    return false
+    // Pages 未配置密钥时，退化为允许外部直接触发，优先保证轮询可用
+    return true
   }
 
   const authHeader = c.req.header('Authorization')
